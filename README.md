@@ -76,70 +76,61 @@ object's aggregate score is derived from its SPNs.
 | SAM matches svc, service, sql, app, backup, agent | **+5** | Naming convention signals a service account |
 | SPN embeds an explicit port | **+3** | More specific than a wildcard SPN |
 
-Scores are floored at **0** --- negative totals become zero.
+Scores are floored at **0** — negative totals become zero.
 
-**Aggregated object score**
+### Aggregated object score
 
-The object's Score is derived from its individual SPN scores in one of
-two ways:
+The object's `Score` is derived from its individual SPN scores in one of two ways:
 
-**Default --- Max**
+**Default — Max**
+
+```
 Score = highest individual SPN score on the object
+```
 
-
-A Kerberoastable web service account with one HTTP SPN scores 40 + 25 =
-65. A Veeam server whose best SPN scores 20 stays at 20, no matter how
-many Veeam services it registers.
+A Kerberoastable web service account with one HTTP SPN scores 40 + 25 = 65. A Veeam server whose best SPN scores 20 stays at 20, no matter how many Veeam services it registers.
 
 **-MaxPlusBonus**
+
+```
 Score = Max + min(20, 2 × (unique service classes − 1))
+```
 
+### The 35 threshold
 
-**The 35 threshold**
+`Score >= 35` is the practical high-value line:
 
-Score \>= 35 is the practical high‑value line:
-
-- Any Tier‑2 web service (25) plus any user account signal
-  (+40 Kerberoast, +5 naming) crosses it.
-
+- Any Tier-2 web service (25) plus any user account signal (+40 Kerberoast, +5 naming) crosses it.
 - Any named application on a user account crosses it.
+- Tier-0 noise never approaches it.
 
-- Tier‑0 noise never approaches it.
-
-**Thresholding the output**
+### Thresholding the output
 
 Two switches apply the threshold:
 
-**powershell**
+```powershell
+# Keep only objects with Score >= 30
+.\Get-AllADSPNServices.ps1 -ExcludeDefaultNoise -MinScore 30
 
-***\# Keep only objects with Score \>= 30***
+# Shorthand for -MinScore 35
+.\Get-AllADSPNServices.ps1 -OnlyHighValue
+```
 
-**.\\Get-AllADSPNServices.ps1 -ExcludeDefaultNoise -MinScore 30**
+`-MinScore` is applied **after aggregation**, on the object's final score — not on individual SPNs. This means an object whose best SPN scores 20 but has 10 unique classes survives a `-MinScore 35` filter, even though no single SPN on it would have.
 
-***\# Shorthand for -MinScore 35***
+---
 
-**.\\Get-AllADSPNServices.ps1 -OnlyHighValue**
-
--MinScore is applied **after aggregation**, on the object's final score
---- not on individual SPNs. This means an object whose best SPN scores
-20 but has 10 unique classes survives a -MinScore 35 filter, even though
-no single SPN on it would have.
-
-**Requirements**
+## Requirements
 
 Short list. Nothing exotic.
 
 **Host**
 
-- **Domain‑joined Windows machine.**
-
-- **PowerShell 3.0 or later**
-
-- **No RSAT / AD module required.**
-
-- **No domain admin required.**
-
-- **No credentials required.**
+- Domain-joined Windows machine.
+- PowerShell 3.0 or later.
+- No RSAT / AD module required.
+- No domain admin required.
+- No credentials required.
 
 **Parameter reference**
 
