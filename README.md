@@ -1,4 +1,4 @@
-# Get-AllADSPNServices.ps1
+# SPN-Mining
 
 **One command. One CSV. Every Kerberoastable account, every service account, every web app, every SQL server, every Exchange role, every cluster, every service principal in your forest — ranked by how much an attacker would care.**
 
