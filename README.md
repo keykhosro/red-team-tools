@@ -162,67 +162,48 @@ Short list. Nothing exotic.
 | -GetAllSPNs | Bypass **all** content filters + reset MinScore to 0. Domain and OU scoping still apply. | Full audit, change detection, raw dump. |
 | -NoSilent | return All the results collection to the pipeline. | Use NoSilent only in test environments. In production, it writes all SPNs, which can produce a lot of output. |
 
-**Examples**
+## Examples
 
-*\# 1. Full audit --- every SPN, no filtering*
+```powershell
+# 1. Full audit — every SPN, no filtering
+.\Get-AllADSPNServices.ps1 -GetAllSPNs -OutputPath .\FullAudit.csv
 
-.\\Get-AllADSPNServices.ps1 -GetAllSPNs -OutputPath .\\FullAudit.csv
+# 2. Full noise-filtered ranking
+.\Get-AllADSPNServices.ps1 -ExcludeDefaultNoise -OutputPath .\Ranked.csv
 
-*\# 2. full noise‑filtered ranking*
+# 3. Per-domain report, skip specific OU trees
+.\Get-AllADSPNServices.ps1 -Domain ALBTEST -ExcludeDefaultNoise `
+    -FilterOU 'DISABLEDCOMPUTERS','UNUSEDCOMPUTERS' -OutputPath .\ALBTEST_Clean.csv
 
-.\\Get-AllADSPNServices.ps1 -ExcludeDefaultNoise -OutputPath
-.\\Ranked.csv
+# 4. Kerberoast shortlist — one row per enabled user account
+.\Get-AllADSPNServices.ps1 -OnlyKerberoastable -OutputPath .\Kerberoast.csv
 
-*\# 3. Per‑domain report skip specific ou trees*
+# 5. Kerberoastable web service accounts (often overlooked)
+.\Get-AllADSPNServices.ps1 -OnlyKerberoastable -ServiceFilter 'HTTP','HTTPS' `
+    -OutputPath .\Kerberoast_Web.csv
 
-.\\Get-AllADSPNServices.ps1 -Domain ALBTEST -ExcludeDefaultNoise \`
+# 6. Named apps + web, drop infra — app footprint
+.\Get-AllADSPNServices.ps1 -OnlyApplicationServices -OutputPath .\Apps.csv
 
--FilterOU 'DISABLEDCOMPUTERS','UNUSEDCOMPUTERS' -OutputPath
-.\\ALBTEST_Clean.csv
+# 7. Scope to one domain
+.\Get-AllADSPNServices.ps1 -Domain ALBTEST -ExcludeDefaultNoise -OutputPath .\ALBTEST.csv
 
-*\# 4. Kerberoast shortlist --- one row per enabled user account*
+# 8. SQL servers only
+.\Get-AllADSPNServices.ps1 -ServiceFilter 'MSSQLSvc' -OutputPath .\SQL.csv
 
-.\\Get-AllADSPNServices.ps1 -OnlyKerberoastable -OutputPath
-.\\Kerberoast.csv
+# 9. Short triage — only the top of the file (score more than 35)
+.\Get-AllADSPNServices.ps1 -ExcludeDefaultNoise -OnlyHighValue -OutputPath .\Short.csv
 
-*\# 5. Kerberoastable web service accounts (often overlooked)*
+# 10. Score more than 15, score calculated with maxplus formula
+.\Get-AllADSPNServices.ps1 -ExcludeDefaultNoise -MaxPlusBonus -MinScore 15 -OutputPath .\Baseline.csv
 
-.\\Get-AllADSPNServices.ps1 -OnlyKerberoastable -ServiceFilter
-'HTTP','HTTPS' \`
+# 11. Named application inventory (asset / licensing)
+.\Get-AllADSPNServices.ps1 -OnlyApplicationServices -OutputPath .\AppInventory.csv
+```
 
--OutputPath .\\Kerberoast_Web.csv
+---
 
-*\# 6. Named apps + web, drop infra --- app footprint*
+## Contributing
 
-.\\Get-AllADSPNServices.ps1 -OnlyApplicationServices -OutputPath
-.\\Apps.csv
+Pull requests are welcome — this tool gets better every time someone adds a class, fixes a tier, or finds a gap in a real forest.
 
-*\# 7. Scope to one domain*
-
-.\\Get-AllADSPNServices.ps1 -Domain ALBTEST -ExcludeDefaultNoise
--OutputPath .\\ALBTEST.csv
-
-*\# 8. SQL servers only*
-
-.\\Get-AllADSPNServices.ps1 -ServiceFilter 'MSSQLSvc' -OutputPath
-.\\SQL.csv
-
-*\# 9. Short triage --- only the top of the file (score more than 35)*
-
-.\\Get-AllADSPNServices.ps1 -ExcludeDefaultNoise -OnlyHighValue
--OutputPath .\\Short.csv
-
-*\# 9. Score more than 15, score calculated with maxplus formulas*
-
-.\\Get-AllADSPNServices.ps1 -ExcludeDefaultNoise -MaxPlusBonus -MinScore
-15 -OutputPath .\\Baseline.csv
-
-*\# 10. Named application inventory (asset / licensing)*
-
-.\\Get-AllADSPNServices.ps1 -OnlyApplicationServices -OutputPath
-.\\AppInventory.csv
-
-**Contributing**
-
-Pull requests are welcome --- this tool gets better every time someone
-adds a class, fixes a tier, or finds a gap in a real forest.
