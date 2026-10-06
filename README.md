@@ -1,113 +1,61 @@
 # Get-AllADSPNServices.ps1
 
-**One command. One CSV. Every Kerberoastable account, every service
-account, every web app, every SQL server, every Exchange role, every
-cluster, every service principal in your forest --- ranked by how much
-an attacker would care.**
+**One command. One CSV. Every Kerberoastable account, every service account, every web app, every SQL server, every Exchange role, every cluster, every service principal in your forest — ranked by how much an attacker would care.**
 
-**A single‑file PowerShell script that turns Active Directory's SPN
-inventory into a red‑team shortlist. It reads what the KDC already
-knows, then:**
+A single-file PowerShell script that turns Active Directory's SPN inventory into a red-team shortlist. It reads what the KDC already knows, then:
 
-- **Cuts the noise --- every computer in AD registers the same handful
-  of default SPNs
-  (HOST, RestrictedKrbHost, DNS, GC, ldap, kadmin, krbtgt, E3514235, Dfsr, WSMAN, TERMSRV).
-  That's \~95% of the total SPN volume and \~0% of the useful signal.
-  The script drops them by default.**
+- **Cuts the noise** — every computer in AD registers the same handful of default SPNs (HOST, RestrictedKrbHost, DNS, GC, ldap, kadmin, krbtgt, E3514235, Dfsr, WSMAN, TERMSRV). That's ~95% of the total SPN volume and ~0% of the useful signal. The script drops them by default.
+- **Skips dead OUs** — anything under a DN like `OU=UNUSEDCOMPUTERS,`, `OU=DISABLEDCOMPUTERS,`, `OU=STALE,`, or any OU you name with `-FilterOU`. Decommissioned servers and old service accounts never reach the report.
+- **Categorizes every SPN** — 100+ service classes mapped to 14 categories (Database, Mail, Web, Backup, Collaboration, DevOps, VoIP, Virtualization, Security, Management, RemoteAccess, FileShare, Infrastructure, Other). You see *what kind of thing* every object is, not just its raw SPN string.
+- **Tiers every SPN** — 4 levels from default noise (Tier 0) → infrastructure (Tier 1) → web / remote / file share (Tier 2) → named applications (Tier 3). Filter by tier with a single switch.
+- **Scores every object** — a numeric priority combining tier, Kerberoastability, naming conventions, and ports. Sort the CSV descending and the top of the file is your target list.
+- **Aggregates one row per AD object** — a Veeam server with 23 SPNs becomes one row, not 23. All services, categories, FQDNs, and ports joined onto that single line.
 
-- **Skips dead OUs --- anything under a DN
-  like OU=UNUSEDCOMPUTERS,, OU=DISABLEDCOMPUTERS,, OU=STALE,, or any OU
-  you name with -FilterOU. Decommissioned servers and old service
-  accounts never reach the report.**
+No admin. No RSAT. No stolen credentials. No exploitation. Just an LDAP read from any domain-joined machine.
 
-- **Categorizes every SPN --- 100+ service classes mapped to 14
-  categories
-  (Database, Mail, Web, Backup, Collaboration, DevOps, VoIP, Virtualization, Security, Management, RemoteAccess, FileShare, Infrastructure, Other).
-  You see *what kind of thing* every object is, not just its raw SPN
-  string.**
+---
 
-- **Tiers every SPN --- 4 levels from default noise (Tier 0) →
-  infrastructure (Tier 1) → web / remote / file share (Tier 2) → named
-  applications (Tier 3). Filter by tier with a single switch.**
+## Tiers
 
-- **Scores every object --- a numeric priority combining tier,
-  Kerberoastability, naming conventions, and ports. Sort the CSV
-  descending and the top of the file is your target list.**
+Every SPN is assigned to one of four tiers based on what the service class tells you about the object.
 
-- **Aggregates one row per AD object --- a Veeam server with 23 SPNs
-  becomes one row, not 23. All services, categories, FQDNs, and ports
-  joined onto that single line.**
+| Tier | Name | What it means | Examples |
+|------|------|---------------|----------|
+| **0** | Default per-computer noise | Auto-registered by every Windows machine that joins the domain. Confirms the machine exists; says nothing about what it does. Dropped by default. | HOST, RestrictedKrbHost, DNS, GC, ldap, kadmin, krbtgt, E3514235, Dfsr, WSMAN, TERMSRV, TERMSERV |
+| **1** | Infrastructure / platform | Deployment roles that define the forest's shape: mail, identity, high availability, replication. | exchangeAB, exchangeMDB, exchangeRFR, FIMService, AgpmServer, MSClusterVirtualServer, MSServerCluster, NtFrs-* |
+| **2** | Web / remote / file share | Kerberos-enabled network protocols. Frequently Kerberoastable, frequently an entry point candidate. | HTTP, HTTPS, www, CIFS, nfs, iSCSITarget, vnc, vmrc, vpn, sip |
+| **3** | Named applications / uncategorized | Business applications, plus any class not matched to Tier 0/1/2 — including RPC UUIDs. The catch-all. | MSSQLSvc, VeeamBackupSvc, SAP, hdb, MSCRMAsyncService, hdfs, spark, solr, RPC UUIDs |
 
-**No admin. No RSAT. No stolen credentials. No exploitation. Just an
-LDAP read from any domain‑joined machine.**
+### Why the split matters
 
-**Tiers**
+- **Tier 0** is the bulk of raw volume with almost no operational signal. Every domain-joined computer has it — dropping it loses nothing beyond what the computer account already tells you.
+- **Tier 1** reveals platform roles. `exchangeAB` means Exchange is deployed; `MSClusterVirtualServer` means a Failover Cluster; `NtFrs-*` means legacy replication is still registered. The list is short and every entry maps to a real deployment.
+- **Tier 2** points at Kerberos-enabled network services. An `HTTP` or `CIFS` SPN proves Kerberos is configured for that protocol on that host — it does *not* prove the endpoint is externally reachable. Treat it as a candidate entry point, not a confirmed one.
+- **Tier 3** is the catch-all. Most of it is named applications (SQL, SAP, Veeam, SharePoint). Some of it is unmapped classes falling through the reference table — RPC UUIDs land here by default rather than being silently dropped.
 
-**Every SPN is assigned to one of four tiers based on what the service
-class tells you about the object.**
+---
 
-| **Tier** | **Name** | **What it means** | **Examples** |
-|----------|----------|-------------------|--------------|
-| **0** | **Default per‑computer noise** | **Auto‑registered by every Windows machine that joins the domain. Confirms the machine exists; says nothing about what it does. Dropped by default.** | **HOST, RestrictedKrbHost, DNS, GC, ldap, kadmin, krbtgt, E3514235, Dfsr, WSMAN, TERMSRV, TERMSERV** |
-| **1** | **Infrastructure / platform** | **Deployment roles that define the forest's shape: mail, identity, high availability, replication.** | **exchangeAB, exchangeMDB, exchangeRFR, FIMService, AgpmServer, MSClusterVirtualServer, MSServerCluster, NtFrs-\*** |
-| **2** | **Web / remote / file share** | **Kerberos‑enabled network protocols. Frequently Kerberoastable, frequently an entry point candidate.** | **HTTP, HTTPS, www, CIFS, nfs, iSCSITarget, vnc, vmrc, vpn, sip** |
-| **3** | **Named applications / uncategorized** | **Business applications, plus any class not matched to Tier 0/1/2 --- including RPC UUIDs. The catch‑all.** | **MSSQLSvc, VeeamBackupSvc, SAP, hdb, MSCRMAsyncService, hdfs, spark, solr, RPC UUIDs** |
+## Filtering by tier
 
-**Why the split matters**
+Four switches control what survives:
 
-- **Tier 0 is the bulk of raw volume with almost no operational signal.
-  Every domain‑joined computer has it --- dropping it loses nothing
-  beyond what the computer account already tells you.**
+```powershell
+# Drop Tier 0 only — the default useful view
+.\Get-AllADSPNServices.ps1 -ExcludeDefaultNoise
 
-- **Tier 1 reveals platform roles. exchangeAB means Exchange is
-  deployed; MSClusterVirtualServer means a Failover
-  Cluster; NtFrs-\* means legacy replication is still registered. The
-  list is short and every entry maps to a real deployment.**
+# Drop Tier 0 + Tier 1 — applications and web services only
+.\Get-AllADSPNServices.ps1 -OnlyApplicationServices
 
-- **Tier 2 points at Kerberos‑enabled network services.
-  An HTTP or CIFS SPN proves Kerberos is configured for that protocol on
-  that host --- it does *not* prove the endpoint is externally reachable.
-  Treat it as a candidate entry point, not a confirmed one.**
+# Drop Tier 2 only — dangerous; can hide Kerberoastable web service accounts
+.\Get-AllADSPNServices.ps1 -ExcludeDefaultNoise -ExcludeWebRemoteShare
 
-- **Tier 3 is the catch‑all. Most of it is named applications (SQL, SAP,
-  Veeam, SharePoint). Some of it is unmapped classes falling through the
-  reference table --- RPC UUIDs land here by default rather than being
-  silently dropped.**
+# Keep everything — bypass all filters and thresholds
+.\Get-AllADSPNServices.ps1 -GetAllSPNs
+```
 
-**Filtering by tier**
+Each switch is independent — nothing is dropped unless you ask for it, except Tier 0 which is dropped by default. `-GetAllSPNs` overrides every content filter (`-ExcludeDefaultNoise`, `-ExcludeInfrastructure`, `-ExcludeWebRemoteShare`, `-OnlyApplicationServices`, `-OnlyUserSPNs`, `-OnlyKerberoastable`) and resets `-MinScore` to 0. Domain scoping (`-Domain`) and OU filtering (`-FilterOU`) still apply.
 
-**Four switches control what survives:**
-
-**powershell**
-
-***\# Drop Tier 0 only --- the default useful view***
-
-**.\\Get-AllADSPNServices.ps1 -ExcludeDefaultNoise**
-
-***\# Drop Tier 0 + Tier 1 --- applications and web services only***
-
-**.\\Get-AllADSPNServices.ps1 -OnlyApplicationServices**
-
-***\# Drop Tier 2 only --- dangerous; can hide Kerberoastable web
-service accounts***
-
-**.\\Get-AllADSPNServices.ps1 -ExcludeDefaultNoise
--ExcludeWebRemoteShare**
-
-***\# Keep everything --- bypass all filters and thresholds***
-
-**.\\Get-AllADSPNServices.ps1 -GetAllSPNs**
-
-**Each switch is independent --- nothing is dropped unless you ask for
-it, except Tier 0 which is dropped by
-default. -GetAllSPNs overrides every content filter
-(-ExcludeDefaultNoise, -ExcludeInfrastructure, -ExcludeWebRemoteShare, -OnlyApplicationServices, -OnlyUserSPNs, -OnlyKerberoastable)
-and resets -MinScore to 0. Domain scoping (-Domain) and OU filtering
-(-FilterOU) still apply.**
-
-**On aggregated rows, the Tier column shows the tier of the
-highest‑scoring individual SPN --- the SPN that determined the object's
-score.**
+On aggregated rows, the `Tier` column shows the tier of the highest-scoring individual SPN — the SPN that determined the object's score.
 
 **Scoring**
 
