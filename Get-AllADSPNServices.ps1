@@ -75,9 +75,9 @@
     PowerShell 3.0+  |  Domain-joined machine  |  Standard domain user is enough.
     References:
       https://adsecurity.org/?page_id=183
-
-.AUTHOR
-    Keykhosro Khosravani
+    Author: keykhosro
+    Date:   2026-10-5
+    Version: 1.0
 #>
 
 [CmdletBinding()]
