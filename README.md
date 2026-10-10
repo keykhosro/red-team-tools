@@ -26,13 +26,6 @@ Every SPN is assigned to one of four tiers based on what the service class tells
 | **2** | Web / remote / file share | Kerberos-enabled network protocols. Frequently Kerberoastable, frequently an entry point candidate. | HTTP, HTTPS, www, CIFS, nfs, iSCSITarget, vnc, vmrc, vpn, sip |
 | **3** | Named applications / uncategorized | Business applications, plus any class not matched to Tier 0/1/2 — including RPC UUIDs. The catch-all. | MSSQLSvc, VeeamBackupSvc, SAP, hdb, MSCRMAsyncService, hdfs, spark, solr, RPC UUIDs |
 
-### Why the split matters
-
-- **Tier 0** is the bulk of raw volume with almost no operational signal. Every domain-joined computer has it — dropping it loses nothing beyond what the computer account already tells you.
-- **Tier 1** reveals platform roles. `exchangeAB` means Exchange is deployed; `MSClusterVirtualServer` means a Failover Cluster; `NtFrs-*` means legacy replication is still registered. The list is short and every entry maps to a real deployment.
-- **Tier 2** points at Kerberos-enabled network services. An `HTTP` or `CIFS` SPN proves Kerberos is configured for that protocol on that host — it does *not* prove the endpoint is externally reachable. Treat it as a candidate entry point, not a confirmed one.
-- **Tier 3** is the catch-all. Most of it is named applications (SQL, SAP, Veeam, SharePoint). Some of it is unmapped classes falling through the reference table — RPC UUIDs land here by default rather than being silently dropped.
-
 ---
 
 ## Filtering by tier
