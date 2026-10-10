@@ -1,6 +1,8 @@
 # SPN Mining
 
-**One command. One CSV. Every Kerberoastable account, every service account, every web app, every SQL server, every Exchange role, every cluster, every service principal in your forest — ranked by how much an attacker would care.**
+**Reveals the services and roles running on every FQDN in the forest — without credentials, admin rights, or touching the target hosts.**
+
+One command. One CSV. Every Kerberoastable account, every service account, every web app, every SQL server, every Exchange role, every cluster, every service principal in your forest — ranked by how much an attacker would care.
 
 A single-file PowerShell script that turns Active Directory's SPN inventory into a red-team shortlist. It reads what the KDC already knows, then:
 
@@ -11,7 +13,7 @@ A single-file PowerShell script that turns Active Directory's SPN inventory into
 - **Scores every object** — a numeric priority combining tier, Kerberoastability, naming conventions, and ports. Sort the CSV descending and the top of the file is your target list.
 - **Aggregates one row per AD object** — a Veeam server with 23 SPNs becomes one row, not 23. All services, categories, FQDNs, and ports joined onto that single line.
 
-No admin. No RSAT. No stolen credentials. No exploitation. Just an LDAP read from any domain-joined machine.
+No RSAT. No exploitation. Just a single LDAP read from any domain-joined machine — run it as the user you're already logged in as.
 
 ---
 
